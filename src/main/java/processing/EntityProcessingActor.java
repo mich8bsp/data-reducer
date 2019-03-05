@@ -35,7 +35,7 @@ public class EntityProcessingActor extends AbstractActor {
             }
         }
 
-        Track combinedTrack = EntitiesCombiner.combine(msg.getMessage(), cachedTrack);
+        Track combinedTrack = msg.getMessage().combine(cachedTrack);
         if(!combinedTrack.equals(cachedTrack)){
             tracksCache.put(trackId, combinedTrack);
             StorageMessage storageMessage = createStorageMessage(combinedTrack);

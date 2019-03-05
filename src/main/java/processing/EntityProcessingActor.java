@@ -12,7 +12,6 @@ import java.util.Map;
 
 public class EntityProcessingActor extends AbstractActor {
 
-    private Map<Integer, Track> tracksCache = new HashMap<>(); //FIXME: timebased
     private RedisClient redisClient = RedisClient.INSTANCE;
 
     @Override
@@ -24,30 +23,25 @@ public class EntityProcessingActor extends AbstractActor {
     }
 
     private void processUpdateMessage(NewTrackUpdateMsg msg) {
-        Integer trackId = msg.getMessage().trackId;
-        Track cachedTrack = tracksCache.get(trackId);
-        if(cachedTrack==null){
-            StorageMessage dbCached = redisClient.fetchLatestTrack(msg.getMessage().getKey(), new RedisStoreKey(msg.getEnvironment(), msg.getTopicName()));
-            if(dbCached!=null){
-                Track trackFromRemoteCache = getTrackFromStorageMessage(dbCached);
-                tracksCache.put(trackId, trackFromRemoteCache);
-                cachedTrack = trackFromRemoteCache;
-            }
+        Track cachedTrack = null;
+        StorageMessage dbCached = redisClient.fetchLatestTrack(msg.getMessage().getKey(), new RedisStoreKey(msg.getEnvironment(), msg.getTopicName()));
+        if (dbCached != null) {
+            cachedTrack = getTrackFromStorageMessage(dbCached);
         }
 
         Track combinedTrack = msg.getMessage().combine(cachedTrack);
-        if(!combinedTrack.equals(cachedTrack)){
-            tracksCache.put(trackId, combinedTrack);
+        if (!combinedTrack.equals(cachedTrack)) {
             StorageMessage storageMessage = createStorageMessage(combinedTrack);
             redisClient.updateTrack(storageMessage, new RedisStoreKey(msg.getEnvironment(), msg.getTopicName()));
         }
         postProcessMessage(msg);
     }
 
-    private void postProcessMessage(NewTrackUpdateMsg msg){
+    private void postProcessMessage(NewTrackUpdateMsg msg) {
         Integer trackId = msg.getMessage().trackId;
-        if(msg.isFinalUpdate()){
-            tracksCache.remove(trackId);
+        if (msg.isFinalUpdate()) {
+            // schedule remove from redis?
+            //            tracksCache.remove(trackId);
         }
     }
 
@@ -56,7 +50,7 @@ public class EntityProcessingActor extends AbstractActor {
         return new StorageMessage(jsonMessage, track.getKey());
     }
 
-    private Track getTrackFromStorageMessage(StorageMessage message){
+    private Track getTrackFromStorageMessage(StorageMessage message) {
         Track track = JsonSerializer.deserialize(message.getJsonMessage());
         return track;
     }
